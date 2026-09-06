@@ -39,6 +39,8 @@ export async function fetchForecast(latitude, longitude, unit) {
   url.searchParams.set('wind_speed_unit', imperial ? 'mph' : 'kmh')
   url.searchParams.set('timezone', 'auto')
   url.searchParams.set('forecast_days', '7')
+  url.searchParams.set('past_hours', '6')
+  url.searchParams.set('forecast_hours', '48')
 
   const response = await fetch(url)
   if (!response.ok) throw new Error('Could not load the forecast')
@@ -63,20 +65,37 @@ export function weatherInfo(code) {
   return { label: 'Cloudy', kind: 'cloud' }
 }
 
-export function nextHours(forecast, count = 12) {
+export function nextHours(forecast, { past = 6, future = 48 } = {}) {
   if (!forecast?.hourly) return []
 
   const now = Date.parse(forecast.current.time)
-  const hours = forecast.hourly.time
-    .map((time, index) => ({
-      time,
-      temperature: forecast.hourly.temperature_2m[index],
-      weatherCode: forecast.hourly.weather_code[index],
-      precipitation: forecast.hourly.precipitation_probability[index],
-    }))
-    .filter((hour) => Date.parse(hour.time) >= now)
+  const hours = forecast.hourly.time.map((time, index) => ({
+    time,
+    temperature: forecast.hourly.temperature_2m[index],
+    weatherCode: forecast.hourly.weather_code[index],
+    precipitation: forecast.hourly.precipitation_probability[index],
+  }))
 
-  return hours.slice(0, count)
+  let currentIndex = -1
+  for (let index = hours.length - 1; index >= 0; index -= 1) {
+    if (Date.parse(hours[index].time) <= now) {
+      currentIndex = index
+      break
+    }
+  }
+  if (currentIndex === -1) currentIndex = 0
+
+  const start = Math.max(0, currentIndex - past)
+  const end = Math.min(hours.length, currentIndex + future)
+
+  return hours.slice(start, end).map((hour, index) => {
+    const sourceIndex = start + index
+    return {
+      ...hour,
+      isCurrent: sourceIndex === currentIndex,
+      isPast: sourceIndex < currentIndex,
+    }
+  })
 }
 
 export function dailyForecast(forecast) {

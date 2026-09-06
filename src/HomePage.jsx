@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AcUnitRounded from '@mui/icons-material/AcUnitRounded'
 import AirRounded from '@mui/icons-material/AirRounded'
 import CloudRounded from '@mui/icons-material/CloudRounded'
@@ -61,6 +61,24 @@ function formatHour(isoTime) {
   }).format(new Date(isoTime))
 }
 
+function calendarDay(isoTime) {
+  const date = new Date(isoTime)
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function formatHourlyDayLabel(isoTime, currentIsoTime) {
+  const diffDays = Math.round(
+    (calendarDay(isoTime) - calendarDay(currentIsoTime)) / 86_400_000,
+  )
+
+  if (diffDays === 0) return 'Today'
+  if (diffDays === -1) return 'Yesterday'
+  if (diffDays === 1) return 'Tomorrow'
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+  }).format(new Date(isoTime))
+}
+
 function formatWeekday(isoDate, index) {
   if (index === 0) return 'Today'
   return new Intl.DateTimeFormat(undefined, {
@@ -113,8 +131,20 @@ export default function HomePage() {
 
   const hours = useMemo(() => nextHours(forecast), [forecast])
   const days = useMemo(() => dailyForecast(forecast), [forecast])
+  const currentHourRef = useRef(null)
   const unitSymbol = unit === 'fahrenheit' ? '°F' : '°C'
   const windUnit = unit === 'fahrenheit' ? 'mph' : 'km/h'
+
+  useEffect(() => {
+    const node = currentHourRef.current
+    if (!node) return
+
+    const scroller = node.parentElement
+    if (!scroller) return
+
+    const left = node.offsetLeft - scroller.clientWidth / 2 + node.offsetWidth / 2
+    scroller.scrollTo({ left: Math.max(0, left), behavior: 'auto' })
+  }, [hours])
 
   useEffect(() => {
     const handle = window.setTimeout(async () => {
@@ -227,7 +257,7 @@ export default function HomePage() {
             </Typography>
             <Typography color="text.secondary">
               Search a city or use your location for current conditions, the next
-              12 hours, and a 7-day outlook.
+              48 hours, and a 7-day outlook.
             </Typography>
           </Box>
 
@@ -350,36 +380,69 @@ export default function HomePage() {
               </Card>
 
               <Box>
-                <Typography variant="h2" sx={{ fontSize: 20, mb: 1.5 }}>
-                  Next 12 hours
+                <Typography variant="h2" sx={{ fontSize: 20, mb: 0.5 }}>
+                  48-hour forecast
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Previous 6 hours and the next 48 hours
                 </Typography>
                 <Stack
                   direction="row"
                   spacing={1.25}
                   sx={{ overflowX: 'auto', pb: 1 }}
                 >
-                  {hours.map((hour) => (
-                    <Card
-                      key={hour.time}
-                      variant="outlined"
-                      sx={{ minWidth: 92, textAlign: 'center' }}
-                    >
-                      <CardContent sx={{ px: 1.5, py: 1.75, '&:last-child': { pb: 1.75 } }}>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatHour(hour.time)}
-                        </Typography>
-                        <Box sx={{ my: 0.75 }}>
-                          <WeatherIcon code={hour.weatherCode} />
-                        </Box>
-                        <Typography fontWeight={700}>
-                          {Math.round(hour.temperature)}°
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {hour.precipitation}%
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {hours.map((hour, index) => {
+                    const previousDate = index > 0 ? hours[index - 1].time.slice(0, 10) : null
+                    const showDayLabel =
+                      index === 0 || hour.time.slice(0, 10) !== previousDate
+
+                    return (
+                      <Card
+                        key={hour.time}
+                        ref={hour.isCurrent ? currentHourRef : undefined}
+                        variant="outlined"
+                        aria-current={hour.isCurrent ? 'true' : undefined}
+                        sx={{
+                          minWidth: hour.isCurrent ? 108 : 92,
+                          flexShrink: 0,
+                          textAlign: 'center',
+                          opacity: hour.isPast ? 0.62 : 1,
+                          borderWidth: hour.isCurrent ? 2 : 1,
+                          borderColor: hour.isCurrent ? 'primary.main' : 'divider',
+                          bgcolor: hour.isCurrent ? 'action.selected' : 'background.paper',
+                          boxShadow: hour.isCurrent ? 3 : 0,
+                        }}
+                      >
+                        <CardContent sx={{ px: 1.5, py: 1.75, '&:last-child': { pb: 1.75 } }}>
+                          <Typography
+                            variant="caption"
+                            color={hour.isCurrent ? 'primary' : 'text.secondary'}
+                            sx={{ display: 'block', minHeight: 20, fontWeight: 600 }}
+                          >
+                            {showDayLabel
+                              ? formatHourlyDayLabel(hour.time, current.time)
+                              : '\u00a0'}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color={hour.isCurrent ? 'primary' : 'text.secondary'}
+                            fontWeight={hour.isCurrent ? 700 : 400}
+                          >
+                            {hour.isCurrent ? 'Now' : formatHour(hour.time)}
+                          </Typography>
+                          <Box sx={{ my: 0.75 }}>
+                            <WeatherIcon code={hour.weatherCode} />
+                          </Box>
+                          <Typography fontWeight={700}>
+                            {Math.round(hour.temperature)}°
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {hour.precipitation}%
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
                 </Stack>
               </Box>
 
