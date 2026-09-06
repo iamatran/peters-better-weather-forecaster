@@ -30,6 +30,8 @@ import Toolbar from '@mui/material/Toolbar'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { useColorScheme } from '@mui/material/styles'
+import { readRecentCities, saveRecentCity } from './recentCities'
+import RadarMap from './RadarMap'
 import {
   dailyForecast,
   fetchForecast,
@@ -122,7 +124,8 @@ export default function HomePage() {
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState([])
   const [searching, setSearching] = useState(false)
-  const [location, setLocation] = useState(null)
+  const [recentCities, setRecentCities] = useState(readRecentCities)
+  const [location, setLocation] = useState(() => readRecentCities()[0] ?? null)
   const [forecast, setForecast] = useState(null)
   const [unit, setUnit] = useState('fahrenheit')
   const [loading, setLoading] = useState(false)
@@ -131,6 +134,12 @@ export default function HomePage() {
 
   const hours = useMemo(() => nextHours(forecast), [forecast])
   const days = useMemo(() => dailyForecast(forecast), [forecast])
+  const dropdownOptions = useMemo(() => {
+    const list = query.trim().length < 2 ? recentCities : options
+    if (!location) return list
+    if (list.some((item) => String(item.id) === String(location.id))) return list
+    return [location, ...list]
+  }, [location, options, query, recentCities])
   const currentHourRef = useRef(null)
   const unitSymbol = unit === 'fahrenheit' ? '°F' : '°C'
   const windUnit = unit === 'fahrenheit' ? 'mph' : 'km/h'
@@ -197,6 +206,13 @@ export default function HomePage() {
     }
   }, [location, unit])
 
+  function selectLocation(place) {
+    setLocation(place)
+    setQuery('')
+    if (!place) return
+    setRecentCities((previous) => saveRecentCity(place, previous))
+  }
+
   function useCurrentLocation() {
     if (!navigator.geolocation) {
       setError('This browser cannot share a location.')
@@ -207,7 +223,7 @@ export default function HomePage() {
     setError('')
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
+        selectLocation({
           id: 'current-location',
           name: 'Current location',
           latitude: position.coords.latitude,
@@ -264,15 +280,23 @@ export default function HomePage() {
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <Autocomplete
               sx={{ flexGrow: 1 }}
-              options={options}
+              options={dropdownOptions}
               loading={searching}
               value={location}
+              openOnFocus
               filterOptions={(items) => items}
-              getOptionLabel={locationLabel}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              onChange={(_, value) => setLocation(value)}
+              getOptionKey={(option) => String(option?.id ?? '')}
+              getOptionLabel={(option) => locationLabel(option) || ''}
+              isOptionEqualToValue={(option, value) =>
+                option?.id != null && value?.id != null && String(option.id) === String(value.id)
+              }
+              groupBy={() => (query.trim().length < 2 ? 'Recent' : 'Search results')}
+              noOptionsText={
+                query.trim().length < 2 ? 'Search a city to get started' : 'No matching cities'
+              }
+              onChange={(_, value) => selectLocation(value)}
               onInputChange={(_, value, reason) => {
-                if (reason === 'input') setQuery(value)
+                if (reason === 'input' || reason === 'clear') setQuery(value)
               }}
               renderInput={(params) => (
                 <TextField
@@ -378,6 +402,8 @@ export default function HomePage() {
                   </Stack>
                 </CardContent>
               </Card>
+
+              <RadarMap latitude={location.latitude} longitude={location.longitude} />
 
               <Box>
                 <Typography variant="h2" sx={{ fontSize: 20, mb: 0.5 }}>

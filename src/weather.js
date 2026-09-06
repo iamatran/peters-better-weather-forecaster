@@ -66,7 +66,7 @@ export function weatherInfo(code) {
 }
 
 export function nextHours(forecast, { past = 6, future = 48 } = {}) {
-  if (!forecast?.hourly) return []
+  if (!forecast?.hourly || !forecast?.current?.time) return []
 
   const now = Date.parse(forecast.current.time)
   const hours = forecast.hourly.time.map((time, index) => ({
