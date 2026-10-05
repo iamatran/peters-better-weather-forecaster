@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import AirRounded from "@mui/icons-material/AirRounded";
 import ChevronLeftRounded from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRounded from "@mui/icons-material/ChevronRightRounded";
 import KeyboardDoubleArrowLeftRounded from "@mui/icons-material/KeyboardDoubleArrowLeftRounded";
 import KeyboardDoubleArrowRightRounded from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
+import OpacityRounded from "@mui/icons-material/OpacityRounded";
+import SvgIcon from "@mui/material/SvgIcon";
+import ThermostatRounded from "@mui/icons-material/ThermostatRounded";
 import LocationOnRounded from "@mui/icons-material/LocationOnRounded";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -133,38 +137,83 @@ function precipLabel(day) {
   return `${Math.round(day.precipitation)}%`;
 }
 
-function TileLine({ label, day, emphasize }) {
+function roundOrDash(value, suffix) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${Math.round(value)}${suffix}`;
+}
+
+const metricIconSx = { fontSize: "1.05em", color: "inherit" };
+
+function CloudRainIcon(props) {
+  return (
+    <SvgIcon {...props} viewBox="0 0 24 24">
+      <path d="M17.6 9.2A4.2 4.2 0 0 0 13.5 6c-1.6 0-3 .9-3.7 2.2A3.3 3.3 0 0 0 6.4 11.4c0 1.8 1.5 3.3 3.3 3.3h7.6c1.6 0 2.9-1.3 2.9-2.9 0-1.5-1.1-2.7-2.6-2.6" />
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        d="M8.2 17.2v3M12 16.4v4.2M15.8 17.2v3"
+      />
+    </SvgIcon>
+  );
+}
+
+function Metric({ icon, children }) {
   return (
     <Box
-      sx={{
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "center",
-        columnGap: 0.75,
-        rowGap: 0.15,
-        fontWeight: emphasize ? 700 : 500,
-      }}
+      component="span"
+      sx={{ display: "inline-flex", alignItems: "center", gap: "1px" }}
     >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 0.75,
-          whiteSpace: "nowrap",
-        }}
-      >
+      {icon}
+      {children}
+    </Box>
+  );
+}
+
+const cellSx = {
+  p: 0,
+  border: 0,
+  whiteSpace: "nowrap",
+  verticalAlign: "middle",
+  lineHeight: 1.35,
+};
+
+function TileLine({ label, day, emphasize, windUnit }) {
+  return (
+    <Box
+      component="tr"
+      sx={{ fontWeight: emphasize ? 700 : 500, fontSize: 9.5 }}
+    >
+      <Box component="td" sx={cellSx}>
         {day?.weatherCode != null ? (
-          <WeatherIcon code={day.weatherCode} sx={{ fontSize: 18 }} />
+          <WeatherIcon code={day.weatherCode} sx={{ fontSize: "1.15em", display: "block" }} />
         ) : (
-          <Box sx={{ width: 18 }} />
+          <Box sx={{ width: "1.15em", height: "1.15em" }} />
         )}
-        <Box component="span" sx={{ color: "text.secondary" }}>
-          {label}
-        </Box>
-        <Box component="span">{tempPair(day)}</Box>
       </Box>
-      <Box component="span" sx={{ ml: "auto", color: "text.secondary" }}>
-        {precipLabel(day)}
+      <Box component="td" sx={{ ...cellSx, color: "text.secondary", pr: "3px" }}>
+        {label}
+      </Box>
+      <Box component="td" sx={cellSx}>
+        <Metric icon={<ThermostatRounded sx={metricIconSx} />}>
+          {tempPair(day)}
+        </Metric>
+      </Box>
+      <Box component="td" sx={{ ...cellSx, pl: "3px" }}>
+        <Metric icon={<OpacityRounded sx={metricIconSx} />}>
+          {roundOrDash(day?.humidity, "%")}
+        </Metric>
+      </Box>
+      <Box component="td" sx={{ ...cellSx, pl: "3px" }}>
+        <Metric icon={<AirRounded sx={metricIconSx} />}>
+          {roundOrDash(day?.wind, ` ${windUnit}`)}
+        </Metric>
+      </Box>
+      <Box component="td" sx={{ ...cellSx, pl: "3px", textAlign: "left" }}>
+        <Metric icon={<CloudRainIcon sx={{ ...metricIconSx, fontSize: "1.25em" }} />}>
+          {precipLabel(day)}
+        </Metric>
       </Box>
     </Box>
   );
@@ -178,6 +227,7 @@ export default function MonthlyView({
   longitude,
   placeLabel,
 }) {
+  const windUnit = unit === "fahrenheit" ? "mph" : "km/h";
   const today = localDateISO(timezone);
   const todayCursor = cursorFromDate(today);
   const initialDate = selectInitialDate(days, today);
@@ -455,7 +505,7 @@ export default function MonthlyView({
               minHeight: 0,
               display: "grid",
               gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-              gridTemplateRows: `auto repeat(${weekCount}, minmax(200px, 1fr))`,
+              gridTemplateRows: `auto repeat(${weekCount}, minmax(148px, 1fr))`,
               gap: { xs: 0.5, sm: 0.75 },
             }}
           >
@@ -489,6 +539,8 @@ export default function MonthlyView({
                 precipitation: average(
                   priorYears.map((day) => day?.precipitation),
                 ),
+                humidity: average(priorYears.map((day) => day?.humidity)),
+                wind: average(priorYears.map((day) => day?.wind)),
               };
               const forecastIso =
                 cursor.year > todayCursor.year
@@ -516,9 +568,9 @@ export default function MonthlyView({
                     bgcolor: "background.paper",
                     minHeight: 0,
                     overflow: "hidden",
-                    px: 1.25,
-                    py: 1.25,
-                    fontSize: { xs: 12, sm: 13 },
+                    px: 0.5,
+                    py: 0.75,
+                    fontSize: { xs: 11, sm: 12 },
                     lineHeight: 1.45,
                   }}
                 >
@@ -540,21 +592,37 @@ export default function MonthlyView({
                       sx={{ alignSelf: "center", my: "auto" }}
                     />
                   ) : (
-                    <>
-                      {historyYears.map((year, yearIndex) => (
+                    <Box
+                      component="table"
+                      sx={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        tableLayout: "auto",
+                      }}
+                    >
+                      <Box component="tbody">
+                        {historyYears.map((year, yearIndex) => (
+                          <TileLine
+                            key={year}
+                            label={String(year)}
+                            day={priorYears[yearIndex]}
+                            windUnit={windUnit}
+                          />
+                        ))}
                         <TileLine
-                          key={year}
-                          label={String(year)}
-                          day={priorYears[yearIndex]}
+                          label="Avg"
+                          day={averageDay}
+                          emphasize
+                          windUnit={windUnit}
                         />
-                      ))}
-                      <TileLine label="Avg" day={averageDay} emphasize />
-                      <TileLine
-                        label={String(cursor.year)}
-                        day={forecastDay}
-                        emphasize
-                      />
-                    </>
+                        <TileLine
+                          label={String(cursor.year)}
+                          day={forecastDay}
+                          emphasize
+                          windUnit={windUnit}
+                        />
+                      </Box>
+                    </Box>
                   )}
                 </Box>
               );

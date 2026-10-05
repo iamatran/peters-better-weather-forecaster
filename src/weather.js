@@ -68,9 +68,10 @@ export async function fetchMonthlyForecast(latitude, longitude, unit) {
   url.searchParams.set('longitude', String(longitude))
   url.searchParams.set(
     'daily',
-    'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+    'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,relative_humidity_2m_mean,wind_speed_10m_max',
   )
   url.searchParams.set('temperature_unit', imperial ? 'fahrenheit' : 'celsius')
+  url.searchParams.set('wind_speed_unit', imperial ? 'mph' : 'kmh')
   url.searchParams.set('timezone', 'auto')
   url.searchParams.set('forecast_days', '16')
   url.searchParams.set('past_days', '31')
@@ -89,9 +90,10 @@ export async function fetchArchiveDaily(latitude, longitude, unit, startDate, en
   url.searchParams.set('end_date', endDate)
   url.searchParams.set(
     'daily',
-    'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+    'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,relative_humidity_2m_mean,wind_speed_10m_max',
   )
   url.searchParams.set('temperature_unit', imperial ? 'fahrenheit' : 'celsius')
+  url.searchParams.set('wind_speed_unit', imperial ? 'mph' : 'kmh')
   url.searchParams.set('timezone', 'auto')
 
   const response = await fetch(url)
@@ -105,6 +107,8 @@ export async function fetchArchiveDaily(latitude, longitude, unit, startDate, en
     high: data.daily.temperature_2m_max[index],
     low: data.daily.temperature_2m_min[index],
     precipitation: data.daily.precipitation_probability_max[index],
+    humidity: data.daily.relative_humidity_2m_mean[index],
+    wind: data.daily.wind_speed_10m_max[index],
   }))
 }
 
@@ -168,6 +172,8 @@ export function dailyForecast(forecast) {
     high: forecast.daily.temperature_2m_max[index],
     low: forecast.daily.temperature_2m_min[index],
     precipitation: forecast.daily.precipitation_probability_max[index],
+    humidity: forecast.daily.relative_humidity_2m_mean?.[index] ?? null,
+    wind: forecast.daily.wind_speed_10m_max?.[index] ?? null,
   }))
 }
 
