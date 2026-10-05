@@ -10,7 +10,6 @@ import Slider from '@mui/material/Slider'
 import Stack from '@mui/material/Stack'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
-import { useColorScheme } from '@mui/material/styles'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { maplibreGL } from '@maplibre/maplibre-gl-leaflet'
@@ -28,12 +27,7 @@ const RADAR_OPACITY = 0.72
 const BASE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://openfreemap.org">OpenFreeMap</a> &copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>'
 
-function baseStyleUrl(colorMode) {
-  if (colorMode === 'dark') {
-    return 'https://tiles.openfreemap.org/styles/dark'
-  }
-  return 'https://tiles.openfreemap.org/styles/positron'
-}
+const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
 
 export default function RadarMap({ latitude, longitude }) {
   const containerRef = useRef(null)
@@ -41,9 +35,6 @@ export default function RadarMap({ latitude, longitude }) {
   const baseLayerRef = useRef(null)
   const layerCacheRef = useRef(new Map())
   const markerRef = useRef(null)
-  const { mode, systemMode } = useColorScheme()
-  const colorMode = (mode === 'system' ? systemMode : mode) === 'dark' ? 'dark' : 'light'
-
   const [host, setHost] = useState('')
   const [frames, setFrames] = useState([])
   const [frameIndex, setFrameIndex] = useState(0)
@@ -115,7 +106,7 @@ export default function RadarMap({ latitude, longitude }) {
     if (!map || !mapReady) return
 
     const nextBase = maplibreGL({
-      style: baseStyleUrl(colorMode),
+      style: BASE_STYLE_URL,
     }).addTo(map)
 
     if (baseLayerRef.current) {
@@ -123,7 +114,7 @@ export default function RadarMap({ latitude, longitude }) {
     }
     baseLayerRef.current = nextBase
     layerCacheRef.current.forEach((layer) => layer.bringToFront())
-  }, [colorMode, mapReady])
+  }, [mapReady])
 
   useEffect(() => {
     let cancelled = false

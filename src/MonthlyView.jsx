@@ -145,7 +145,14 @@ function TileLine({ label, day, emphasize }) {
         fontWeight: emphasize ? 700 : 500,
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, whiteSpace: "nowrap" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 0.75,
+          whiteSpace: "nowrap",
+        }}
+      >
         {day?.weatherCode != null ? (
           <WeatherIcon code={day.weatherCode} sx={{ fontSize: 18 }} />
         ) : (
@@ -277,7 +284,9 @@ export default function MonthlyView({
         const rows = groups.flat();
         setHistoryDays(rows);
         if (rows.length === 0) {
-          setHistoryError("Historical weather is not available for this month.");
+          setHistoryError(
+            "Historical weather is not available for this month.",
+          );
         }
       })
       .finally(() => {
@@ -327,7 +336,7 @@ export default function MonthlyView({
         </Stack>
         <Typography color="text.secondary">
           {lastForecast
-            ? `Each day shows the last 3 years and their average. The forecast line fills in through ${formatShortDate(lastForecast.date)}. Future years keep those earlier conditions.`
+            ? `Each day shows the last 3 years and their average. The forecast line fills in next 16 days through ${formatShortDate(lastForecast.date)}.`
             : "Each day shows the last 3 years, their average, and the forecast."}
         </Typography>
       </Box>
@@ -346,7 +355,12 @@ export default function MonthlyView({
             "&:last-child": { pb: { xs: 1.25, sm: 2 } },
           }}
         >
-          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1 }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.5}
+            sx={{ mb: 1 }}
+          >
             <IconButton
               aria-label="Previous year"
               onClick={() => moveYear(-1)}
@@ -464,12 +478,17 @@ export default function MonthlyView({
               const isToday = cell.iso === today;
               const priorYears = historyYears.map((year) => {
                 if (!isRealDate(year, cursor.month, cell.day)) return null;
-                return historyByDate.get(isoDate(year, cursor.month, cell.day)) ?? null;
+                return (
+                  historyByDate.get(isoDate(year, cursor.month, cell.day)) ??
+                  null
+                );
               });
               const averageDay = {
                 high: average(priorYears.map((day) => day?.high)),
                 low: average(priorYears.map((day) => day?.low)),
-                precipitation: average(priorYears.map((day) => day?.precipitation)),
+                precipitation: average(
+                  priorYears.map((day) => day?.precipitation),
+                ),
               };
               const forecastIso =
                 cursor.year > todayCursor.year
@@ -477,7 +496,9 @@ export default function MonthlyView({
                   : cell.iso;
               const forecastDay =
                 cursor.year > todayCursor.year
-                  ? (days.find((day) => day.date === forecastIso && day.date >= today) ?? null)
+                  ? (days.find(
+                      (day) => day.date === forecastIso && day.date >= today,
+                    ) ?? null)
                   : cell.data;
 
               return (
@@ -504,12 +525,20 @@ export default function MonthlyView({
                   <Typography
                     component="div"
                     color={isToday ? "primary" : "text.primary"}
-                    sx={{ fontWeight: 700, fontSize: { xs: 16, sm: 20 }, lineHeight: 1.2, mb: 0.75 }}
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: { xs: 16, sm: 20 },
+                      lineHeight: 1.2,
+                      mb: 0.75,
+                    }}
                   >
                     {cell.day}
                   </Typography>
                   {historyLoading && historyDays.length === 0 ? (
-                    <CircularProgress size={14} sx={{ alignSelf: "center", my: "auto" }} />
+                    <CircularProgress
+                      size={14}
+                      sx={{ alignSelf: "center", my: "auto" }}
+                    />
                   ) : (
                     <>
                       {historyYears.map((year, yearIndex) => (
@@ -520,7 +549,11 @@ export default function MonthlyView({
                         />
                       ))}
                       <TileLine label="Avg" day={averageDay} emphasize />
-                      <TileLine label={String(cursor.year)} day={forecastDay} emphasize />
+                      <TileLine
+                        label={String(cursor.year)}
+                        day={forecastDay}
+                        emphasize
+                      />
                     </>
                   )}
                 </Box>
