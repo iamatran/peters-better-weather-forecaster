@@ -12,11 +12,14 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@maplibre/maplibre-gl-leaflet": "^0.1.4",
     "@mui/icons-material": "^9.4.0",
     "@mui/material": "^9.4.0",
     "leaflet": "^1.9.4",
+    "maplibre-gl": "^6.12.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router": "^8.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

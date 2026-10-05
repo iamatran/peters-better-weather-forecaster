@@ -1,5 +1,6 @@
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search'
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
+const ARCHIVE_URL = 'https://historical-forecast-api.open-meteo.com/v1/forecast'
 
 export async function searchLocations(query) {
   const name = query.trim()
@@ -16,6 +17,19 @@ export async function searchLocations(query) {
 
   const data = await response.json()
   return data.results ?? []
+}
+
+export function localDateISO(timeZone) {
+  const options = {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }
+  if (timeZone) options.timeZone = timeZone
+
+  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(new Date())
+  const value = (type) => parts.find((part) => part.type === type)?.value
+  return `${value('year')}-${value('month')}-${value('day')}`
 }
 
 export async function fetchForecast(latitude, longitude, unit) {
@@ -45,6 +59,53 @@ export async function fetchForecast(latitude, longitude, unit) {
   const response = await fetch(url)
   if (!response.ok) throw new Error('Could not load the forecast')
   return response.json()
+}
+
+export async function fetchMonthlyForecast(latitude, longitude, unit) {
+  const imperial = unit === 'fahrenheit'
+  const url = new URL(FORECAST_URL)
+  url.searchParams.set('latitude', String(latitude))
+  url.searchParams.set('longitude', String(longitude))
+  url.searchParams.set(
+    'daily',
+    'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+  )
+  url.searchParams.set('temperature_unit', imperial ? 'fahrenheit' : 'celsius')
+  url.searchParams.set('timezone', 'auto')
+  url.searchParams.set('forecast_days', '16')
+  url.searchParams.set('past_days', '31')
+
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Could not load the monthly forecast')
+  return response.json()
+}
+
+export async function fetchArchiveDaily(latitude, longitude, unit, startDate, endDate) {
+  const imperial = unit === 'fahrenheit'
+  const url = new URL(ARCHIVE_URL)
+  url.searchParams.set('latitude', String(latitude))
+  url.searchParams.set('longitude', String(longitude))
+  url.searchParams.set('start_date', startDate)
+  url.searchParams.set('end_date', endDate)
+  url.searchParams.set(
+    'daily',
+    'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+  )
+  url.searchParams.set('temperature_unit', imperial ? 'fahrenheit' : 'celsius')
+  url.searchParams.set('timezone', 'auto')
+
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Could not load historical weather')
+  const data = await response.json()
+  if (!data.daily?.time) return []
+
+  return data.daily.time.map((date, index) => ({
+    date,
+    weatherCode: data.daily.weather_code[index],
+    high: data.daily.temperature_2m_max[index],
+    low: data.daily.temperature_2m_min[index],
+    precipitation: data.daily.precipitation_probability_max[index],
+  }))
 }
 
 export function locationLabel(place) {
@@ -108,4 +169,12 @@ export function dailyForecast(forecast) {
     low: forecast.daily.temperature_2m_min[index],
     precipitation: forecast.daily.precipitation_probability_max[index],
   }))
+}
+
+export function monthlyForecastDays(forecast) {
+  const days = dailyForecast(forecast)
+  if (!forecast?.timezone || days.length === 0) return days
+
+  const monthPrefix = localDateISO(forecast.timezone).slice(0, 7)
+  return days.filter((day) => day.date.slice(0, 7) >= monthPrefix)
 }

@@ -13,20 +13,26 @@ import Typography from '@mui/material/Typography'
 import { useColorScheme } from '@mui/material/styles'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { maplibreGL } from '@maplibre/maplibre-gl-leaflet'
+import { setWorkerUrl } from 'maplibre-gl'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { fetchRadarFrames, formatRadarTime, radarTileUrl } from './radar'
+
+setWorkerUrl(workerUrl)
 
 const CITY_ZOOM = 8
 const FRAME_MS = 550
 const REFRESH_MS = 5 * 60 * 1000
 const RADAR_OPACITY = 0.72
 const BASE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>'
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://openfreemap.org">OpenFreeMap</a> &copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>'
 
-function baseTileUrl(colorMode) {
+function baseStyleUrl(colorMode) {
   if (colorMode === 'dark') {
-    return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    return 'https://tiles.openfreemap.org/styles/dark'
   }
-  return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+  return 'https://tiles.openfreemap.org/styles/positron'
 }
 
 export default function RadarMap({ latitude, longitude }) {
@@ -35,8 +41,8 @@ export default function RadarMap({ latitude, longitude }) {
   const baseLayerRef = useRef(null)
   const layerCacheRef = useRef(new Map())
   const markerRef = useRef(null)
-  const { mode } = useColorScheme()
-  const colorMode = mode === 'dark' ? 'dark' : 'light'
+  const { mode, systemMode } = useColorScheme()
+  const colorMode = (mode === 'system' ? systemMode : mode) === 'dark' ? 'dark' : 'light'
 
   const [host, setHost] = useState('')
   const [frames, setFrames] = useState([])
@@ -68,6 +74,8 @@ export default function RadarMap({ latitude, longitude }) {
       fillOpacity: 0.95,
       weight: 2,
     }).addTo(map)
+
+    map.attributionControl?.addAttribution(BASE_ATTRIBUTION)
 
     mapRef.current = map
     markerRef.current = marker
@@ -106,16 +114,15 @@ export default function RadarMap({ latitude, longitude }) {
     const map = mapRef.current
     if (!map || !mapReady) return
 
-    const nextBase = L.tileLayer(baseTileUrl(colorMode), {
-      attribution: BASE_ATTRIBUTION,
-      maxZoom: 10,
+    const nextBase = maplibreGL({
+      style: baseStyleUrl(colorMode),
     }).addTo(map)
-    nextBase.bringToBack()
 
     if (baseLayerRef.current) {
       map.removeLayer(baseLayerRef.current)
     }
     baseLayerRef.current = nextBase
+    layerCacheRef.current.forEach((layer) => layer.bringToFront())
   }, [colorMode, mapReady])
 
   useEffect(() => {

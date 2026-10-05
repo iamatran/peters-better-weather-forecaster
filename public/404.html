@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Peter's Better Weather</title>
+    <script>
+      // GitHub Pages has no SPA fallback. Send /monthly and /forecast back
+      // through index.html, which restores the path before React Router starts.
+      var segmentCount = 1
+      var location = window.location
+      location.replace(
+        location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') +
+        location.pathname.split('/').slice(0, 1 + segmentCount).join('/') + '/?/' +
+        location.pathname.slice(1).split('/').slice(segmentCount).join('/').replace(/&/g, '~and~') +
+        (location.search ? '&' + location.search.slice(1).replace(/&/g, '~and~') : '') +
+        location.hash
+      )
+    </script>
+  </head>
+  <body></body>
+</html>

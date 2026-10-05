@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import AcUnitRounded from '@mui/icons-material/AcUnitRounded'
 import AirRounded from '@mui/icons-material/AirRounded'
-import CloudRounded from '@mui/icons-material/CloudRounded'
+import CalendarMonthRounded from '@mui/icons-material/CalendarMonthRounded'
+import CloseRounded from '@mui/icons-material/CloseRounded'
 import DarkModeRounded from '@mui/icons-material/DarkModeRounded'
 import FilterDramaRounded from '@mui/icons-material/FilterDramaRounded'
-import Foggy from '@mui/icons-material/Foggy'
 import LightModeRounded from '@mui/icons-material/LightModeRounded'
 import LocationOnRounded from '@mui/icons-material/LocationOnRounded'
 import MyLocationRounded from '@mui/icons-material/MyLocationRounded'
-import ThunderstormRounded from '@mui/icons-material/ThunderstormRounded'
 import WaterDropRounded from '@mui/icons-material/WaterDropRounded'
 import WbSunnyRounded from '@mui/icons-material/WbSunnyRounded'
 import Alert from '@mui/material/Alert'
@@ -23,6 +21,8 @@ import Container from '@mui/material/Container'
 import IconButton from '@mui/material/IconButton'
 import LinearProgress from '@mui/material/LinearProgress'
 import Stack from '@mui/material/Stack'
+import Tab from '@mui/material/Tab'
+import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
@@ -30,32 +30,21 @@ import Toolbar from '@mui/material/Toolbar'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import { useColorScheme } from '@mui/material/styles'
-import { readRecentCities, saveRecentCity } from './recentCities'
+import { useLocation, useNavigate } from 'react-router'
+import MonthlyView from './MonthlyView'
+import { readRecentCities, removeRecentCity, saveRecentCity } from './recentCities'
 import RadarMap from './RadarMap'
+import WeatherIcon from './WeatherIcon'
 import {
   dailyForecast,
   fetchForecast,
+  fetchMonthlyForecast,
   locationLabel,
+  monthlyForecastDays,
   nextHours,
   searchLocations,
   weatherInfo,
 } from './weather'
-
-const WEATHER_ICONS = {
-  clear: WbSunnyRounded,
-  partly: FilterDramaRounded,
-  cloud: CloudRounded,
-  fog: Foggy,
-  rain: WaterDropRounded,
-  snow: AcUnitRounded,
-  storm: ThunderstormRounded,
-}
-
-function WeatherIcon({ code, fontSize = 'medium', sx }) {
-  const { kind } = weatherInfo(code)
-  const Icon = WEATHER_ICONS[kind] ?? CloudRounded
-  return <Icon color="primary" fontSize={fontSize} sx={sx} />
-}
 
 function formatHour(isoTime) {
   return new Intl.DateTimeFormat(undefined, {
@@ -89,16 +78,17 @@ function formatWeekday(isoDate, index) {
 }
 
 function ModeToggle() {
-  const { mode, setMode } = useColorScheme()
+  const { mode, setMode, systemMode } = useColorScheme()
 
   if (!mode) return null
 
-  const nextMode = mode === 'dark' ? 'light' : 'dark'
+  const resolvedMode = mode === 'system' ? systemMode : mode
+  const nextMode = resolvedMode === 'dark' ? 'light' : 'dark'
 
   return (
     <Tooltip title={nextMode === 'dark' ? 'Dark mode' : 'Light mode'}>
       <IconButton color="inherit" onClick={() => setMode(nextMode)}>
-        {mode === 'dark' ? <LightModeRounded /> : <DarkModeRounded />}
+        {resolvedMode === 'dark' ? <LightModeRounded /> : <DarkModeRounded />}
       </IconButton>
     </Tooltip>
   )
@@ -131,9 +121,26 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
+  const route = useLocation()
+  const navigate = useNavigate()
+  const path = route.pathname.replace(/\/$/, '') || '/'
+  const tab = path.endsWith('/forecast') ? 'forecast' : 'monthly'
+
+  useEffect(() => {
+    if (!path.endsWith('/monthly') && !path.endsWith('/forecast')) {
+      navigate('/monthly', { replace: true })
+    }
+  }, [path, navigate])
+  const [monthlyForecast, setMonthlyForecast] = useState(null)
+  const [monthlyLoading, setMonthlyLoading] = useState(false)
+  const [monthlyError, setMonthlyError] = useState('')
 
   const hours = useMemo(() => nextHours(forecast), [forecast])
   const days = useMemo(() => dailyForecast(forecast), [forecast])
+  const monthDays = useMemo(
+    () => monthlyForecastDays(monthlyForecast),
+    [monthlyForecast],
+  )
   const dropdownOptions = useMemo(() => {
     const list = query.trim().length < 2 ? recentCities : options
     if (!location) return list
@@ -206,11 +213,53 @@ export default function HomePage() {
     }
   }, [location, unit])
 
+  useEffect(() => {
+    if (!location) return
+
+    let cancelled = false
+
+    async function loadMonthly() {
+      setMonthlyLoading(true)
+      setMonthlyError('')
+      setMonthlyForecast(null)
+      try {
+        const data = await fetchMonthlyForecast(
+          location.latitude,
+          location.longitude,
+          unit,
+        )
+        if (!cancelled) setMonthlyForecast(data)
+      } catch (loadError) {
+        if (!cancelled) {
+          setMonthlyForecast(null)
+          setMonthlyError(loadError.message)
+        }
+      } finally {
+        if (!cancelled) setMonthlyLoading(false)
+      }
+    }
+
+    loadMonthly()
+    return () => {
+      cancelled = true
+    }
+  }, [location, unit])
+
   function selectLocation(place) {
     setLocation(place)
     setQuery('')
-    if (!place) return
+    if (!place) {
+      setMonthlyForecast(null)
+      setMonthlyError('')
+      return
+    }
     setRecentCities((previous) => saveRecentCity(place, previous))
+  }
+
+  function removeRecent(place, event) {
+    event.preventDefault()
+    event.stopPropagation()
+    setRecentCities((previous) => removeRecentCity(place.id, previous))
   }
 
   function useCurrentLocation() {
@@ -263,19 +312,60 @@ export default function HomePage() {
           </ToggleButtonGroup>
           <ModeToggle />
         </Toolbar>
+        <Tabs
+          value={tab}
+          onChange={(_, value) => navigate(value === 'forecast' ? '/forecast' : '/monthly')}
+          aria-label="Forecast views"
+          centered
+          sx={{
+            '& .MuiTab-root': {
+              fontSize: { xs: '1.05rem', sm: '1.2rem' },
+              minHeight: 56,
+            },
+          }}
+        >
+          <Tab
+            icon={<CalendarMonthRounded />}
+            iconPosition="start"
+            label="Monthly"
+            value="monthly"
+            id="monthly-tab"
+            aria-controls="monthly-panel"
+          />
+          <Tab
+            icon={<WbSunnyRounded />}
+            iconPosition="start"
+            label="Forecast"
+            value="forecast"
+            id="forecast-tab"
+            aria-controls="forecast-panel"
+          />
+        </Tabs>
       </AppBar>
 
-      <Container maxWidth="md" sx={{ py: { xs: 3, sm: 5 }, flexGrow: 1 }}>
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h1" sx={{ fontSize: { xs: 32, sm: 44 }, mb: 1 }}>
-              A clearer forecast
-            </Typography>
-            <Typography color="text.secondary">
-              Search a city or use your location for current conditions, the next
-              48 hours, and a 7-day outlook.
-            </Typography>
-          </Box>
+      <Container
+        maxWidth={tab === 'monthly' ? false : 'md'}
+        sx={{
+          py: { xs: 2, sm: 3 },
+          px: { xs: 1.5, sm: 3 },
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%',
+        }}
+      >
+        <Stack spacing={2} sx={{ flexGrow: 1, minHeight: 0 }}>
+          {tab === 'forecast' && (
+            <Box>
+              <Typography variant="h1" sx={{ fontSize: { xs: 32, sm: 44 }, mb: 1 }}>
+                A clearer forecast
+              </Typography>
+              <Typography color="text.secondary">
+                Search a city or use your location for current conditions, the next
+                48 hours, and a 7-day outlook.
+              </Typography>
+            </Box>
+          )}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <Autocomplete
@@ -284,7 +374,14 @@ export default function HomePage() {
               loading={searching}
               value={location}
               openOnFocus
-              filterOptions={(items) => items}
+              filterOptions={(items) => {
+                if (query.trim().length >= 2 || !location) return items
+                const stillRecent = recentCities.some(
+                  (item) => String(item.id) === String(location.id),
+                )
+                if (stillRecent) return items
+                return items.filter((item) => String(item.id) !== String(location.id))
+              }}
               getOptionKey={(option) => String(option?.id ?? '')}
               getOptionLabel={(option) => locationLabel(option) || ''}
               isOptionEqualToValue={(option, value) =>
@@ -295,6 +392,34 @@ export default function HomePage() {
                 query.trim().length < 2 ? 'Search a city to get started' : 'No matching cities'
               }
               onChange={(_, value) => selectLocation(value)}
+              renderOption={(props, option) => {
+                const { key, ...optionProps } = props
+                const isRecent =
+                  query.trim().length < 2 &&
+                  recentCities.some((item) => String(item.id) === String(option.id))
+                const label = locationLabel(option)
+                return (
+                  <li key={key} {...optionProps}>
+                    <Box component="span" sx={{ flex: 1, minWidth: 0 }}>
+                      {label}
+                    </Box>
+                    {isRecent && (
+                      <IconButton
+                        size="small"
+                        aria-label={`Remove ${label}`}
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                        }}
+                        onClick={(event) => removeRecent(option, event)}
+                        sx={{ ml: 1, mr: -0.5 }}
+                      >
+                        <CloseRounded fontSize="small" />
+                      </IconButton>
+                    )}
+                  </li>
+                )
+              }}
               onInputChange={(_, value, reason) => {
                 if (reason === 'input' || reason === 'clear') setQuery(value)
               }}
@@ -338,10 +463,11 @@ export default function HomePage() {
             </Tooltip>
           </Stack>
 
-          {loading && <LinearProgress />}
-          {error && <Alert severity="error">{error}</Alert>}
+          {(loading || (tab === 'monthly' && monthlyLoading)) && <LinearProgress />}
+          {tab === 'forecast' && error && <Alert severity="error">{error}</Alert>}
+          {tab === 'monthly' && monthlyError && <Alert severity="error">{monthlyError}</Alert>}
 
-          {!location && !error && (
+          {!location && !(tab === 'forecast' ? error : monthlyError) && (
             <Card variant="outlined">
               <CardContent sx={{ py: 6, textAlign: 'center' }}>
                 <FilterDramaRounded color="primary" sx={{ fontSize: 48, mb: 1 }} />
@@ -355,8 +481,34 @@ export default function HomePage() {
             </Card>
           )}
 
-          {current && currentInfo && (
-            <>
+          {tab === 'monthly' && location && monthlyLoading && monthDays.length === 0 && !monthlyError && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+              <CircularProgress />
+            </Box>
+          )}
+
+          {tab === 'monthly' && location && monthDays.length > 0 && (
+            <Box
+              role="tabpanel"
+              id="monthly-panel"
+              aria-labelledby="monthly-tab"
+              sx={{ flexGrow: 1, minHeight: 0, display: 'flex' }}
+            >
+              <MonthlyView
+                days={monthDays}
+                timezone={monthlyForecast.timezone}
+                unit={unit}
+                unitSymbol={unitSymbol}
+                latitude={location.latitude}
+                longitude={location.longitude}
+                placeLabel={locationLabel(location)}
+              />
+            </Box>
+          )}
+
+          {tab === 'forecast' && current && currentInfo && (
+            <Box role="tabpanel" id="forecast-panel" aria-labelledby="forecast-tab">
+            <Stack spacing={3}>
               <Card>
                 <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
                   <Stack
@@ -514,7 +666,8 @@ export default function HomePage() {
                   })}
                 </Stack>
               </Box>
-            </>
+            </Stack>
+            </Box>
           )}
         </Stack>
       </Container>

@@ -68,3 +68,16 @@ export function saveRecentCity(place, previous = readRecentCities()) {
 
   return next
 }
+
+export function removeRecentCity(id, previous = readRecentCities()) {
+  const next = previous.filter((item) => String(item.id) !== String(id))
+  const storage = getStorage()
+  if (storage) {
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // Ignore quota or private-mode failures; the in-memory list still updates.
+    }
+  }
+  return next
+}
